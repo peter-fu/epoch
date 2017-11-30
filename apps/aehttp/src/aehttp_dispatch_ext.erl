@@ -183,7 +183,7 @@ handle_ping_(PingObj) ->
     case aec_sync:compare_ping_objects(LocalPingObj, PingObj) of
         {error, different_genesis_blocks} ->
             Source = maps:get(<<"source">>, PingObj),
-            aec_peers:block_peer(Source, PingObj),
+            aec_peers:block_peer(Source),
             abort_sync(Source,  <<"Different genesis blocks">>);
         ok ->
             Source = maps:get(<<"source">>, PingObj),
