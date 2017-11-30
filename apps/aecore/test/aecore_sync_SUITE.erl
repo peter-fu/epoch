@@ -518,8 +518,8 @@ unsubscribe(N, Event) ->
 call_proxy(N, Req) ->
     call_proxy(N, Req, ?PROXY_CALL_RETRIES, 3000).
 
-call_proxy(N, Req, Timeout) ->
-    call_proxy(N, Req, ?PROXY_CALL_RETRIES, Timeout).
+%% call_proxy(N, Req, Timeout) ->
+%%     call_proxy(N, Req, ?PROXY_CALL_RETRIES, Timeout).
 
 call_proxy(N, Req, Tries, Timeout) when Tries > 0 ->
     Ref = erlang:monitor(process, {?PROXY, N}),
