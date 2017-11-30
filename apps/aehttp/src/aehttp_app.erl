@@ -36,7 +36,7 @@ start(_StartType, _StartArgs) ->
 
 local_peer_uri() ->
     Port = get_external_port(),
-    local_peer(Port, Port).
+    local_peer(Port).
 
 local_internal_http_uri() ->
     Port = get_internal_port(),
@@ -85,7 +85,7 @@ start_websocket_internal() ->
                                  [{env, [{dispatch, Dispatch}]}]),
     ok.
 
-local_peer(Port, ExtPort) ->
+local_peer(Port) ->
     Addr = get_local_peer_address(),
     case aeu_requests:parse_uri(Addr) of
         {_Scheme, _Host, _Port} -> % a valid address
