@@ -72,12 +72,11 @@ origin(Tx) ->
 
 %% @doc Note that we drop invalid transactions, but we allow them in the block.
 -spec apply_signed(list(signed_tx()), trees(), non_neg_integer()) ->
-                          {ok, trees()}.
+                          {list(signed_tx()), trees()}.
 apply_signed(SignedTxs, Trees0, Height) ->
-    Txs = verify_and_extract_txs(SignedTxs),
-    {Trees1, TotalFee} = apply_txs_and_calculate_total_fee(Txs, Trees0, Height),
+    {FilteredSignedTxs, Txs, Trees1, TotalFee} = do_apply_signed(SignedTxs, Trees0, Height),
     Trees2 = grant_fee_to_miner(Txs, Trees1, Height, TotalFee),
-    {ok, Trees2}.
+    {FilteredSignedTxs, Trees2}.
 
 %% TODO: there should be an easier way to do this...
 -spec is_coinbase(signed_tx()) -> boolean().
@@ -91,43 +90,30 @@ is_coinbase(Signed) ->
 %%% Internal functions
 %%%=============================================================================
 
--spec verify_and_extract_txs(list(signed_tx())) -> list(tx()).
-verify_and_extract_txs(SignedTxs) ->
-    verify_and_extract_txs(SignedTxs, []).
+-spec do_apply_signed(list(signed_tx()), trees(), height()) ->
+                             {list(signed_tx()), list(tx()), trees(), non_neg_integer()}.
+do_apply_signed(SignedTxs, Trees, Height) ->
+    do_apply_signed(SignedTxs, [], [], Trees, 0, Height).
 
--spec verify_and_extract_txs(list(signed_tx()), list(tx())) -> list(tx()).
-verify_and_extract_txs([], Txs) ->
-    lists:reverse(Txs);
-verify_and_extract_txs([SignedTx | Rest], Txs) ->
+do_apply_signed([], FilteredSignedTxs, Txs, Trees, TotalFee, _Height) ->
+    {lists:reverse(FilteredSignedTxs), lists:reverse(Txs), Trees, TotalFee};
+do_apply_signed([SignedTx | Rest], FilteredSignedTxs, Txs, Trees0, TotalFee, Height) ->
     case aec_tx_sign:verify(SignedTx) of
         ok ->
             Tx = aec_tx_sign:data(SignedTx),
-            verify_and_extract_txs(Rest, [Tx | Txs]);
-        {error, Reason} ->
-            lager:info("Tx ~p verification failed with ~p",
-                       [SignedTx, Reason]),
-            verify_and_extract_txs(Rest, Txs)
-    end.
-
--spec apply_txs_and_calculate_total_fee(list(tx()), trees(), height()) ->
-                                               {trees(), non_neg_integer()}.
-apply_txs_and_calculate_total_fee(Txs, Trees, Height) ->
-    apply_txs_and_calculate_total_fee(Txs, Trees, Height, 0).
-
--spec apply_txs_and_calculate_total_fee(list(tx()), trees(), height(), non_neg_integer()) ->
-                                               {trees(), non_neg_integer()}.
-apply_txs_and_calculate_total_fee([], Trees, _Height, TotalFee) ->
-    {Trees, TotalFee};
-apply_txs_and_calculate_total_fee([Tx | Rest], Trees0, Height, TotalFee) ->
-    case check_single(Tx, Trees0, Height) of
-        {ok, Trees1} ->
-            {ok, Trees2} = process_single(Tx, Trees1, Height),
-            TxFee = fee(Tx),
-            apply_txs_and_calculate_total_fee(Rest, Trees2, Height, TotalFee + TxFee);
-        {error, Reason} ->
-            lager:info("Tx ~p cannot be applied due to an error ~p",
-                       [Tx, Reason]),
-            apply_txs_and_calculate_total_fee(Rest, Trees0, Height, TotalFee)
+            case check_single(Tx, Trees0, Height) of
+                {ok, Trees1} ->
+                    {ok, Trees2} = process_single(Tx, Trees1, Height),
+                    TxFee = fee(Tx),
+                    do_apply_signed(Rest, [SignedTx | FilteredSignedTxs], [Tx | Txs],
+                                    Trees2, TotalFee + TxFee, Height);
+                {error, Reason} ->
+                    lager:debug("Tx ~p cannot be applied due to an error ~p",
+                                [Tx, Reason]),
+                    do_apply_signed(Rest, FilteredSignedTxs, Txs, Trees0, TotalFee, Height)
+            end;
+        {error, _Reason} ->
+            do_apply_signed(Rest, FilteredSignedTxs, Txs, Trees0, TotalFee, Height)
     end.
 
 signers(Tx) ->

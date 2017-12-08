@@ -88,11 +88,11 @@ txs(Block) ->
     Block#block.txs.
 
 -spec new(block(), list(signed_tx()), trees()) -> block().
-new(LastBlock, Txs, Trees0) ->
+new(LastBlock, Txs0, Trees0) ->
     LastBlockHeight = height(LastBlock),
     {ok, LastBlockHeaderHash} = hash_internal_representation(LastBlock),
     Height = LastBlockHeight + 1,
-    {ok, Trees} = aec_tx:apply_signed(Txs, Trees0, Height),
+    {Txs, Trees} = aec_tx:apply_signed(Txs0, Trees0, Height),
     {ok, TxsTree} = aec_txs_trees:new(Txs),
     {ok, TxsRootHash} = aec_txs_trees:root_hash(TxsTree),
     #block{height = Height,
